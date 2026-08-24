@@ -1,0 +1,9 @@
+Este projeto espera o arquivo do modelo em:
+
+    app/src/main/assets/yolo11s.tflite
+
+Ele nao esta incluido no repositorio (binario grande, gerado localmente).
+Gere-o com o comando descrito no README.md da raiz do projeto (secao
+"Exportacao do modelo") e copie o .tflite resultante para este diretorio
+com esse nome exato. Depois apague este arquivo de texto — ele so existe
+para o diretorio "assets" nao ficar vazio no git.

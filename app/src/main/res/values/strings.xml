@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Alerta TTC</string>
+    <string name="notification_channel_name">Alerta de colisao ativo</string>
+    <string name="notification_title">Alerta TTC monitorando</string>
+    <string name="notification_text">Camera ativa, sem gravacao. Toque para abrir.</string>
+    <string name="btn_start">Iniciar</string>
+    <string name="btn_stop">Encerrar</string>
+    <string name="label_ttc">TTC</string>
+    <string name="label_fps">FPS</string>
+    <string name="label_latency">LATENCIA</string>
+    <string name="ttc_placeholder">-- s</string>
+    <string name="alert_text">ALERTA</string>
+    <string name="permission_rationale">Precisamos da camera para medir o TTC do veiculo a frente. Nenhum video e gravado.</string>
+</resources>

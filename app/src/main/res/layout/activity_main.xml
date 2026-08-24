@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    tools:context=".MainActivity">
+
+    <!-- Medidores: fps e latencia, topo -->
+    <LinearLayout
+        android:id="@+id/rowMetrics"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="24dp"
+        android:paddingHorizontal="20dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView
+                android:id="@+id/lblFps"
+                style="@style/MetricLabel"
+                android:text="@string/label_fps" />
+            <TextView
+                android:id="@+id/tvFps"
+                style="@style/MetricValue"
+                tools:text="12.3" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView
+                android:id="@+id/lblLatency"
+                style="@style/MetricLabel"
+                android:text="@string/label_latency" />
+            <TextView
+                android:id="@+id/tvLatency"
+                style="@style/MetricValue"
+                tools:text="87 ms" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp"
+        android:fontFamily="monospace"
+        tools:text="GPU delegate ativo * corte 0.62"
+        app:layout_constraintTop_toBottomOf="@id/rowMetrics"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- TTC central -->
+    <TextView
+        android:id="@+id/lblTtc"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/label_ttc"
+        android:textColor="@color/text_secondary"
+        android:textSize="16sp"
+        android:letterSpacing="0.2"
+        app:layout_constraintBottom_toTopOf="@id/tvTtc"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/tvTtc"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/ttc_placeholder"
+        android:textColor="@color/text_primary"
+        android:textSize="88sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-condensed"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/tvAlert"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/alert_text"
+        android:textColor="@color/accent_alert"
+        android:textSize="34sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.15"
+        android:visibility="invisible"
+        app:layout_constraintTop_toBottomOf="@id/tvTtc"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Button
+        android:id="@+id/btnStop"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginBottom="32dp"
+        android:text="@string/btn_stop"
+        android:backgroundTint="@color/surface"
+        android:textColor="@color/text_primary"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Overlay de borda vermelha em alerta, por cima de tudo -->
+    <View
+        android:id="@+id/overlayBorder"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/alert_border"
+        android:visibility="invisible" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
