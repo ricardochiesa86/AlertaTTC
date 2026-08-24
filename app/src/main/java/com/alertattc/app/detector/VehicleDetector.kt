@@ -15,7 +15,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Wrapper do yolo11s.tflite via LiteRT (org.tensorflow.lite.*). Tenta o
+ * Wrapper do model.tflite via LiteRT (org.tensorflow.lite.*). Tenta o
  * delegate de GPU (Mali, via OpenGL/OpenCL) e cai para CPU se a GPU nao
  * estiver disponivel ou a criacao do delegate falhar. NNAPI nao e usado:
  * foi descontinuado a partir do Android 15 e os drivers Exynos sao
@@ -28,7 +28,7 @@ import kotlin.math.min
  */
 class VehicleDetector(
     private val context: Context,
-    private val assetPath: String = "yolo11s.tflite",
+    private val assetPath: String = "model.tflite",
     private val inputSize: Int = 640,
     private val confMin: Float = 0.25f,
     private val vehicleClasses: Set<Int> = setOf(2, 3, 5, 7),
