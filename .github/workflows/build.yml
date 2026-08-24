@@ -14,8 +14,8 @@ jobs:
 
       - name: Baixar o modelo da release
         run: |
-          curl -L -o app/src/main/assets/yolo11s.tflite \
-            https://github.com/ricardochiesa86/AlertaTTC/releases/download/modelo-v1/yolo11s.tflite
+          curl -L -o app/src/main/assets/model.tflite \
+            https://github.com/ricardochiesa86/AlertaTTC/releases/download/modelo-v2/model.tflite
           ls -la app/src/main/assets/
 
       - name: Instalar Java 17
