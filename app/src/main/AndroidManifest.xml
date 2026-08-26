@@ -26,6 +26,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AlertaTTC.Settings"
+            android:label="@string/settings_title"
+            android:screenOrientation="portrait" />
+
         <service
             android:name=".CollisionAlertService"
             android:exported="false"

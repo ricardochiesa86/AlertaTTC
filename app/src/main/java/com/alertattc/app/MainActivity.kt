@@ -1,6 +1,7 @@
 package com.alertattc.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -16,10 +17,10 @@ import kotlinx.coroutines.launch
 
 /**
  * Unica tela ativa: TTC ao vivo, overlay de alerta, fps e latencia de
- * inferencia. Nao ha onboarding nem ajustes aqui de proposito — essa
- * interface completa vem depois, a partir de um prototipo de design
- * separado. Aqui o objetivo e so instrumentar o suficiente pra medir se a
- * tecnica sustenta fps/latencia ao vivo no S20 FE.
+ * inferencia. Nao ha onboarding aqui de proposito — essa interface
+ * completa vem depois, a partir de um prototipo de design separado. O
+ * preview de camera (diagnostico) e a tela de ajustes existem para dar
+ * visibilidade da cadeia de deteccao, nao como produto final.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -49,7 +50,20 @@ class MainActivity : AppCompatActivity() {
             finish()
         }
 
+        binding.btnTogglePreview.setOnClickListener {
+            CollisionAlertService.setPreviewEnabled(!CollisionAlertService.previewEnabled.value)
+        }
+
+        binding.btnSettings.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
+        binding.btnRecalibrate.setOnClickListener {
+            CollisionAlertService.requestRecalibration()
+        }
+
         observeState()
+        observePreview()
         ensurePermissionsAndStart()
     }
 
@@ -76,13 +90,36 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun observePreview() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    CollisionAlertService.previewEnabled.collect { enabled ->
+                        binding.btnTogglePreview.text = getString(
+                            if (enabled) R.string.btn_hide_camera else R.string.btn_show_camera
+                        )
+                        binding.previewContainer.visibility = if (enabled) android.view.View.VISIBLE else android.view.View.GONE
+                        if (!enabled) binding.detectionOverlay.update(null)
+                    }
+                }
+                launch {
+                    CollisionAlertService.previewFrame.collect { frame ->
+                        binding.detectionOverlay.update(frame)
+                    }
+                }
+            }
+        }
+    }
+
     private fun render(state: UiState) {
         binding.tvTtc.text = if (state.ttcS != null) "%.1f s".format(state.ttcS) else getString(R.string.ttc_placeholder)
         binding.tvFps.text = "%.1f".format(state.fps)
         binding.tvLatency.text = "${state.latencyMs} ms"
 
+        // state.status ja descreve o corte em uso com contexto (painel encontrado/nao/manual),
+        // entao nao repete o numero cru aqui pra nao duplicar a informacao.
         val motor = if (state.usingGpu) "GPU" else "CPU"
-        binding.tvStatus.text = "$motor · corte ${"%.2f".format(state.corteFrac)} · ${state.status}"
+        binding.tvStatus.text = "$motor · ${state.status}"
 
         val alertVisible = if (state.alerta) android.view.View.VISIBLE else android.view.View.INVISIBLE
         binding.tvAlert.visibility = alertVisible

@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBack"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:layout_marginBottom="16dp"
+            android:text="@string/settings_back" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_title"
+            android:textColor="@color/text_primary"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="20dp"
+            android:text="@string/settings_subtitle"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+
+        <TextView
+            style="@style/SettingsSectionHeader"
+            android:text="@string/settings_section_types" />
+
+        <!-- Colisao -->
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SettingsCard">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView
+                    style="@style/SettingsCardTitle"
+                    android:textColor="@color/accent_alert"
+                    android:text="@string/settings_collision_title" />
+                <TextView
+                    style="@style/SettingsCardDesc"
+                    android:text="@string/settings_collision_desc" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSampleCollision"
+                    style="@style/SettingsSampleButton"
+                    android:text="@string/settings_play_sample" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Indisponivel -->
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SettingsCard">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView
+                    style="@style/SettingsCardTitle"
+                    android:textColor="@color/accent_warn"
+                    android:text="@string/settings_unavailable_title" />
+                <TextView
+                    style="@style/SettingsCardDesc"
+                    android:text="@string/settings_unavailable_desc" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSampleUnavailable"
+                    style="@style/SettingsSampleButton"
+                    android:text="@string/settings_play_sample" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Confirmacao -->
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SettingsCard">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView
+                    style="@style/SettingsCardTitle"
+                    android:textColor="@color/accent_ok"
+                    android:text="@string/settings_started_title" />
+                <TextView
+                    style="@style/SettingsCardDesc"
+                    android:text="@string/settings_started_desc" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSampleStarted"
+                    style="@style/SettingsSampleButton"
+                    android:text="@string/settings_play_sample" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            style="@style/SettingsSectionHeader"
+            android:text="@string/settings_section_variant" />
+        <TextView
+            style="@style/SettingsCardDesc"
+            android:layout_marginBottom="12dp"
+            android:text="@string/settings_variant_hint" />
+
+        <com.google.android.material.card.MaterialCardView style="@style/SettingsCard">
+            <RadioGroup
+                android:id="@+id/radioGroupVariant"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="8dp" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            style="@style/SettingsSectionHeader"
+            android:text="@string/settings_section_volume" />
+
+        <com.google.android.material.card.MaterialCardView style="@style/SettingsCard">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderVolume"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:valueFrom="10"
+                    app:valueTo="100"
+                    app:stepSize="5" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSampleVolume"
+                    style="@style/SettingsSampleButton"
+                    android:text="@string/settings_play_at_volume" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            style="@style/SettingsSectionHeader"
+            android:text="@string/settings_section_diagnostics" />
+
+        <com.google.android.material.card.MaterialCardView style="@style/SettingsCard">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginEnd="12dp">
+                    <TextView
+                        style="@style/SettingsCardTitle"
+                        android:text="@string/settings_disable_crop_title" />
+                    <TextView
+                        style="@style/SettingsCardDesc"
+                        android:text="@string/settings_disable_crop_desc" />
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchDisableCrop"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="56dp"
+                    android:minHeight="56dp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="24dp" />
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

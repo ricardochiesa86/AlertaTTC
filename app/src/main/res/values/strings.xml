@@ -12,4 +12,32 @@
     <string name="ttc_placeholder">-- s</string>
     <string name="alert_text">ALERTA</string>
     <string name="permission_rationale">Precisamos da camera para medir o TTC do veiculo a frente. Nenhum video e gravado.</string>
+
+    <string name="btn_show_camera">Ver camera</string>
+    <string name="btn_hide_camera">Ocultar camera</string>
+    <string name="btn_settings">Ajustes</string>
+    <string name="btn_recalibrate">Recalibrar</string>
+
+    <string name="settings_title">Ajustes de alerta</string>
+    <string name="settings_subtitle">Use com o carro parado. Cada som toca uma amostra ao vivo.</string>
+    <string name="settings_back">← Voltar</string>
+
+    <string name="settings_section_types">Tipos de alerta</string>
+    <string name="settings_collision_title">Alerta de colisao</string>
+    <string name="settings_collision_desc">Toca quando o TTC calculado fica abaixo de 2s por tempo suficiente. E o som de \"aja agora\": o mais alto e mais urgente dos tres.</string>
+    <string name="settings_unavailable_title">Indisponivel / falha</string>
+    <string name="settings_unavailable_desc">Toca quando a camera para, o aparelho esquenta demais ou a deteccao cai. Significa \"parei de te proteger\", nao \"freie\".</string>
+    <string name="settings_started_title">Confirmacao</string>
+    <string name="settings_started_desc">Um som curto e discreto quando o monitoramento comeca a funcionar de verdade.</string>
+    <string name="settings_play_sample">Tocar amostra</string>
+
+    <string name="settings_section_variant">Som do alerta de colisao</string>
+    <string name="settings_variant_hint">Escolha qual padrao funciona melhor dentro do carro em movimento.</string>
+
+    <string name="settings_section_volume">Volume do alerta</string>
+    <string name="settings_play_at_volume">Tocar no volume atual</string>
+
+    <string name="settings_section_diagnostics">Diagnostico</string>
+    <string name="settings_disable_crop_title">Desativar corte do painel</string>
+    <string name="settings_disable_crop_desc">Forca o quadro inteiro na deteccao, ignorando a calibracao automatica. Use para isolar se o corte esta atrapalhando a deteccao. Padrao: desligado (calibracao automatica no comando).</string>
 </resources>

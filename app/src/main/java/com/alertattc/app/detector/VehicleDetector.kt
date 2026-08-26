@@ -15,7 +15,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Wrapper do model.tflite via LiteRT (org.tensorflow.lite.*). Tenta o
+ * Wrapper do modelo em assets/model.tflite via LiteRT
+ * (org.tensorflow.lite.*). O nome do asset e neutro de proposito: o
+ * workflow de build baixa o .tflite de uma release e o grava com esse
+ * nome, entao trocar a versao do YOLO nao exige mexer no codigo. Tenta o
  * delegate de GPU (Mali, via OpenGL/OpenCL) e cai para CPU se a GPU nao
  * estiver disponivel ou a criacao do delegate falhar. NNAPI nao e usado:
  * foi descontinuado a partir do Android 15 e os drivers Exynos sao

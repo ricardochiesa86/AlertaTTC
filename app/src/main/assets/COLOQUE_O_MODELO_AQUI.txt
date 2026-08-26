@@ -1,9 +1,15 @@
 Este projeto espera o arquivo do modelo em:
 
-    app/src/main/assets/yolo11s.tflite
+    app/src/main/assets/model.tflite
 
-Ele nao esta incluido no repositorio (binario grande, gerado localmente).
-Gere-o com o comando descrito no README.md da raiz do projeto (secao
-"Exportacao do modelo") e copie o .tflite resultante para este diretorio
-com esse nome exato. Depois apague este arquivo de texto — ele so existe
-para o diretorio "assets" nao ficar vazio no git.
+O nome e neutro de proposito (nao "yolo11s.tflite"): o workflow de build
+no GitHub baixa o .tflite de uma release e grava com esse nome, entao
+trocar a versao do YOLO nao exige mexer no codigo nem no workflow.
+
+O arquivo nao esta no repositorio (binario grande). Para gerar
+localmente, use o comando descrito no README.md da raiz do projeto
+(secao "Exportacao do modelo") — o tools/export_model.py ja copia o
+resultado para ca com o nome certo.
+
+Depois apague este arquivo de texto — ele so existe para o diretorio
+"assets" nao ficar vazio no git.

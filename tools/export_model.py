@@ -9,7 +9,12 @@ Uso:
     python tools/export_model.py
 
 Gera yolo11s_saved_model/yolo11s_float32.tflite e copia para
-app/src/main/assets/yolo11s.tflite.
+app/src/main/assets/model.tflite.
+
+O nome de destino e neutro (model.tflite, sem a versao do YOLO) porque o
+workflow de build no GitHub baixa o modelo de uma release e grava com
+esse mesmo nome. Trocar de yolo11s para outra variante nao deve exigir
+mudanca no Kotlin nem no workflow — so gerar um .tflite novo aqui.
 """
 import shutil
 import sys
@@ -19,7 +24,7 @@ from ultralytics import YOLO
 
 MODELO_PT = "yolo11s.pt"          # baixado automaticamente pela ultralytics na 1a chamada
 IMGSZ = 640
-DEST = Path(__file__).resolve().parent.parent / "app" / "src" / "main" / "assets" / "yolo11s.tflite"
+DEST = Path(__file__).resolve().parent.parent / "app" / "src" / "main" / "assets" / "model.tflite"
 
 
 def main():

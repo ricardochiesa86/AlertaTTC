@@ -15,7 +15,13 @@ data class TtcResult(
     val ttcS: Double?,
     val baixoSeguidos: Int,
     val alertaDisparado: Boolean,
-    val leader: Detection?
+    val leader: Detection?,
+    // Campos de diagnostico abaixo: so relatam por onde a logica passou,
+    // nao influenciam nenhuma decisao. Ver TtcEngine.process.
+    val afterWidthFilter: Int,
+    val afterCenterFilter: Int,
+    val semLiderMotivo: String?,
+    val semTtcMotivo: String?
 )
 
 /**
@@ -29,6 +35,11 @@ data class TtcResult(
  * definidas em SEGUNDOS (JANELA_SUAV_S, JANELA_DERIV_S) e convertidas
  * para frames a cada atualizacao de fps medido (ver updateWindowSizes). A
  * formula do TTC em si nao muda: ja opera em px/segundo dos dois lados.
+ *
+ * process() tambem devolve POR QUE cada portao barrou o calculo (campos
+ * de diagnostico em TtcResult) — os limiares e a ordem de avaliacao sao
+ * exatamente os mesmos do script, so reescritos em if/else explicito em
+ * vez de uma condicao composta, pra poder nomear o motivo em cada ramo.
  */
 class TtcEngine {
 
@@ -43,6 +54,13 @@ class TtcEngine {
         const val JANELA_SUAV_S = 0.3
         const val JANELA_DERIV_S = 0.5
     }
+
+    private data class SelecaoLider(
+        val leader: Detection?,
+        val afterWidthFilter: Int,
+        val afterCenterFilter: Int,
+        val motivo: String?
+    )
 
     private val bruto = FixedWindowDeque<Float>(9)
     private val serie = FixedWindowDeque<Pair<Double, Double>>(15)      // (t, largura_suave)
@@ -70,10 +88,20 @@ class TtcEngine {
     }
 
     /** Lider = maior caixa no terco central; descarta caixa mais larga que 0.7*frameW (e o proprio carro / erro). */
-    private fun selecionarLider(deteccoes: List<Detection>, frameW: Int): Detection? {
-        val candidatos = deteccoes.filter { it.width <= 0.7f * frameW }
-            .filter { it.centerX in (0.33f * frameW)..(0.67f * frameW) }
-        return candidatos.maxByOrNull { it.width }
+    private fun selecionarLider(deteccoes: List<Detection>, frameW: Int): SelecaoLider {
+        if (deteccoes.isEmpty()) {
+            return SelecaoLider(null, 0, 0, "nenhuma deteccao")
+        }
+        val semLargasDemais = deteccoes.filter { it.width <= 0.7f * frameW }
+        if (semLargasDemais.isEmpty()) {
+            return SelecaoLider(null, 0, 0, "todas largas demais (> 70% do quadro)")
+        }
+        val centrais = semLargasDemais.filter { it.centerX in (0.33f * frameW)..(0.67f * frameW) }
+        if (centrais.isEmpty()) {
+            return SelecaoLider(null, semLargasDemais.size, 0, "todas fora do terco central")
+        }
+        val leader = centrais.maxByOrNull { it.width }
+        return SelecaoLider(leader, semLargasDemais.size, centrais.size, null)
     }
 
     /**
@@ -82,13 +110,15 @@ class TtcEngine {
      * @param frameW largura do frame usado para deteccao (mesma referencia usada no recorte central)
      */
     fun process(t: Double, deteccoes: List<Detection>, frameW: Int): TtcResult {
-        val leader = selecionarLider(deteccoes, frameW)
+        val selecao = selecionarLider(deteccoes, frameW)
+        val leader = selecao.leader
 
         var larg: Float? = null
         var suave: Double? = null
         var dw: Double? = null
         var ttc: Double? = null
         var deriva: Double? = null
+        var semTtcMotivo: String? = null
 
         if (leader != null) {
             larg = leader.width
@@ -98,16 +128,25 @@ class TtcEngine {
             serieCx.add(t to leader.centerX.toDouble())
 
             // portao 1: veiculo perto o bastante para o sinal prestar
-            if (suave >= LARG_MIN_PX.toDouble() && serie.size >= MIN_AMOSTRAS_REGRESSAO) {
+            if (suave < LARG_MIN_PX.toDouble()) {
+                semTtcMotivo = "largura suavizada (%.0fpx) abaixo do minimo (%.0fpx)".format(suave, LARG_MIN_PX)
+            } else if (serie.size < MIN_AMOSTRAS_REGRESSAO) {
+                semTtcMotivo = "serie curta (${serie.size}/${MIN_AMOSTRAS_REGRESSAO} amostras)"
+            } else {
                 dw = slope(serie.toList())
                 // portao 2: so aproximacao (caixa crescendo de verdade)
-                if (dw != null && dw > 1.0) {
+                if (dw == null) {
+                    semTtcMotivo = "regressao da largura nao definida"
+                } else if (dw <= 1.0) {
+                    semTtcMotivo = "aproximacao insuficiente (dw=%.1fpx/s, precisa > 1.0px/s)".format(dw)
+                } else {
                     ttc = suave / dw
                     // portao 5: deriva lateral — objeto escorregando pro lado, voce vai passar dele
                     val dcx = slope(serieCx.toList())
                     if (dcx != null) {
                         deriva = abs(dcx) / frameW
                         if (deriva > DERIVA_MAX) {
+                            semTtcMotivo = "deriva lateral acima do limite (%.3f > %.3f)".format(deriva, DERIVA_MAX)
                             ttc = null
                         }
                     }
@@ -127,6 +166,9 @@ class TtcEngine {
             ultimoAlertaT = t
         }
 
-        return TtcResult(larg, suave, dw, deriva, ttc, baixoSeguidos, alerta, leader)
+        return TtcResult(
+            larg, suave, dw, deriva, ttc, baixoSeguidos, alerta, leader,
+            selecao.afterWidthFilter, selecao.afterCenterFilter, selecao.motivo, semTtcMotivo
+        )
     }
 }

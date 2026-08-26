@@ -8,4 +8,14 @@
     <color name="accent_warn">#FFC107</color>
     <color name="accent_alert">#E53935</color>
     <color name="ic_launcher_bg">#0A0A0A</color>
+
+    <!-- Overlay de debug da camera: uma cor por classe COCO de veiculo -->
+    <color name="class_car">#42A5F5</color>
+    <color name="class_moto">#AB47BC</color>
+    <color name="class_bus">#FFA726</color>
+    <color name="class_truck">#26C6DA</color>
+    <color name="class_leader">#33D17A</color>
+    <color name="overlay_third_line">#80FFFFFF</color>
+    <color name="overlay_corte_line">#FFE53935</color>
+    <color name="overlay_label_bg">#B0000000</color>
 </resources>
