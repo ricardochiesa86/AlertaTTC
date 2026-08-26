@@ -297,7 +297,8 @@ class CollisionAlertService : LifecycleService() {
                 if (logThisFrame) {
                     logMonitoring(
                         bitmap.width, bitmap.height, decoded.rotationDegrees, calibrator,
-                        effectiveCorte, corteH, manualNoCrop, result.detections, ttc
+                        effectiveCorte, corteH, manualNoCrop, result.detections, ttc,
+                        result.maxVehicleConf
                     )
                 }
                 publishPreviewFrame(bitmap, decoded.rotationDegrees, effectiveCorte, result.detections, leader = ttc.leader)
@@ -360,7 +361,7 @@ class CollisionAlertService : LifecycleService() {
     private fun logMonitoring(
         frameW: Int, frameH: Int, rotation: Int, calibrator: PanelCalibrator,
         effectiveCorte: Float, corteYPx: Int, manualNoCrop: Boolean,
-        deteccoes: List<Detection>, ttc: TtcResult
+        deteccoes: List<Detection>, ttc: TtcResult, maxVehicleConf: Float
     ) {
         Log.d(TAG_DEBUG, "== frame (monitorando) ==")
         Log.d(TAG_DEBUG, "frame ${frameW}x${frameH} rotacao=${rotation}graus")
@@ -368,6 +369,11 @@ class CollisionAlertService : LifecycleService() {
                 (if (manualNoCrop) " (corte manual desativado nos ajustes — sobrepoe a calibracao)" else ""))
         Log.d(TAG_DEBUG, "corte em uso: frac=%.3f px=%d (deteccao so roda acima dessa linha)".format(effectiveCorte, corteYPx))
         Log.d(TAG_DEBUG, "deteccoes brutas do modelo (ja filtradas por classe/conf, sem filtro de largura/terco): ${deteccoes.size}")
+        // Com 0 deteccoes, este numero diz se o detector esta funcionando:
+        // valor baixo mas variando frame a frame = cena sem veiculo (ok);
+        // colado em 0 ou constante = pre-processamento quebrado.
+        Log.d(TAG_DEBUG, "maior confianca de veiculo no tensor (antes do corte de %.2f): %.4f"
+            .format(0.25f, maxVehicleConf))
         dumpDeteccoes(deteccoes)
         Log.d(TAG_DEBUG, "apos filtro de largura (descarta caixa > 70% do quadro): ${ttc.afterWidthFilter}")
         Log.d(TAG_DEBUG, "apos filtro do terco central (33%-67% da largura): ${ttc.afterCenterFilter}")
