@@ -18,5 +18,13 @@ data class Detection(
 data class DetectorResult(
     val detections: List<Detection>,
     val usedGpu: Boolean,
-    val inferenceMs: Long
+    val inferenceMs: Long,
+    /**
+     * Maior confianca de classe de veiculo vista no tensor de saida, ANTES
+     * do corte por confMin. Existe para distinguir dois casos que produzem
+     * "0 deteccoes" e sao indistinguiveis sem isso: cena sem veiculo
+     * (valor baixo mas plausivel, ex. 0.05-0.20) e pre-processamento
+     * quebrado (valor colado em 0, ou constante frame a frame).
+     */
+    val maxVehicleConf: Float = 0f
 )
