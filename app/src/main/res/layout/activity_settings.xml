@@ -136,13 +136,17 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
+                <!-- valueFrom/valueTo/stepSize sao atributos do FRAMEWORK que o
+                     Slider do Material redeclara (<attr name="android:stepSize"/>),
+                     entao vao com namespace android:, nao app:. Com app: o AAPT
+                     falha com "attribute stepSize not found". -->
                 <com.google.android.material.slider.Slider
                     android:id="@+id/sliderVolume"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:valueFrom="10"
-                    app:valueTo="100"
-                    app:stepSize="5" />
+                    android:valueFrom="10"
+                    android:valueTo="100"
+                    android:stepSize="5" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnSampleVolume"
