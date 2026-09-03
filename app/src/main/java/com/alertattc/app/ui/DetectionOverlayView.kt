@@ -96,17 +96,23 @@ class DetectionOverlayView @JvmOverloads constructor(
         val yCorte = ty(f.corteYPx.toFloat())
         canvas.drawLine(left, yCorte, right, yCorte, linePaint)
 
-        // deteccoes
-        for (d in f.detections) {
-            val isLeader = d == f.leader
-            val color = if (isLeader) leaderPaint.color else colorForClass(d.classId)
+        // alvos rastreados: id estavel, para casar o que se ve com o log
+        for (alvo in f.targets) {
+            val d = alvo.detection
+            val isLeader = alvo.id == f.leaderId
+            val color = when {
+                isLeader -> leaderPaint.color
+                alvo.isStatic -> Color.GRAY
+                else -> colorForClass(d.classId)
+            }
             val paint = if (isLeader) leaderPaint else boxPaint.apply { this.color = color }
             canvas.drawRect(tx(d.x1), ty(d.y1), tx(d.x2), ty(d.y2), paint)
 
-            val label = if (isLeader) {
-                "LIDER ${nameForClass(d.classId)} ${(d.conf * 100).toInt()}%"
-            } else {
-                "${nameForClass(d.classId)} ${(d.conf * 100).toInt()}%"
+            val id = if (alvo.id >= 0) "#${alvo.id} " else ""
+            val label = when {
+                isLeader -> "${id}LIDER ${nameForClass(d.classId)} ${(d.conf * 100).toInt()}%"
+                alvo.isStatic -> "${id}FIXO ${nameForClass(d.classId)}"
+                else -> "$id${nameForClass(d.classId)} ${(d.conf * 100).toInt()}%"
             }
             drawLabel(canvas, label, tx(d.x1), ty(d.y1), color)
         }
