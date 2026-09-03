@@ -13,6 +13,8 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import android.util.Size
+import android.view.OrientationEventListener
+import android.view.Surface
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -28,6 +30,9 @@ import com.alertattc.app.detector.Detection
 import com.alertattc.app.detector.VehicleDetector
 import com.alertattc.app.ttc.CalibrationPrefs
 import com.alertattc.app.ttc.PanelCalibrator
+import com.alertattc.app.ttc.TargetTracker
+import com.alertattc.app.ttc.TrackedTarget
+import com.alertattc.app.ttc.TrackingResult
 import com.alertattc.app.ttc.TtcEngine
 import com.alertattc.app.ttc.TtcResult
 import com.alertattc.app.util.FpsMeter
@@ -70,8 +75,9 @@ data class PreviewFrame(
     val rotationDegrees: Int,
     val corteFrac: Float,
     val corteYPx: Int,
-    val detections: List<Detection>,
-    val leader: Detection?,
+    /** Alvos rastreados: carregam id estavel e a marca de objeto fixo do proprio carro. */
+    val targets: List<TrackedTarget>,
+    val leaderId: Int?,
     val leaderWidthPx: Float?
 )
 
@@ -143,9 +149,12 @@ class CollisionAlertService : LifecycleService() {
     private lateinit var analysisExecutor: ExecutorService
 
     private val ttcEngine = TtcEngine()
+    private val tracker = TargetTracker()
     private val fpsMeter = FpsMeter()
     private var calibratorRef: PanelCalibrator? = null
     private var cameraProvider: ProcessCameraProvider? = null
+    private var imageAnalysis: ImageAnalysis? = null
+    private var orientationListener: OrientationEventListener? = null
 
     private var sessionStartNanos = 0L
     private var lastFpsForWindow = 0.0
@@ -222,9 +231,52 @@ class CollisionAlertService : LifecycleService() {
             provider.unbindAll()
             provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, analysis)
             cameraProvider = provider
+            imageAnalysis = analysis
+            startOrientationTracking()
             sessionStartNanos = SystemClock.elapsedRealtimeNanos()
             _state.value = _state.value.copy(running = true, calibrating = true, status = "calibrando corte do painel")
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    /**
+     * Correcao 3: a Activity esta travada em portrait no manifesto, entao
+     * o targetRotation do CameraX — que por padrao segue a rotacao do
+     * DISPLAY — ficava preso em ROTATION_0 e imageInfo.rotationDegrees
+     * vinha 90 em toda sessao, inclusive com o aparelho na horizontal.
+     * Girar 90 fixo entregava a cena deitada ao modelo (1-5% de frames
+     * com deteccao na horizontal contra 85-92% na vertical, e o letterbox
+     * gerando as duas faixas laterais).
+     *
+     * A correcao e alimentar o targetRotation pela orientacao FISICA do
+     * aparelho (acelerometro). Com isso rotationDegrees passa a variar
+     * sozinho — 90 no retrato, 0/180 no paisagem — e continuamos girando
+     * exatamente o que ele pedir, que agora e "o que falta" de verdade.
+     */
+    private fun startOrientationTracking() {
+        if (orientationListener != null) return
+        val l = object : OrientationEventListener(applicationContext) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+                val rotation = when (orientation) {
+                    in 45 until 135 -> Surface.ROTATION_270
+                    in 135 until 225 -> Surface.ROTATION_180
+                    in 225 until 315 -> Surface.ROTATION_90
+                    else -> Surface.ROTATION_0
+                }
+                imageAnalysis?.let {
+                    if (it.targetRotation != rotation) {
+                        it.targetRotation = rotation
+                        Log.d(TAG_DEBUG, "orientacao fisica mudou: targetRotation=$rotation")
+                    }
+                }
+            }
+        }
+        if (l.canDetectOrientation()) {
+            l.enable()
+            orientationListener = l
+        } else {
+            Log.w(TAG, "sem sensor de orientacao; rotacao segue o display (travado em portrait)")
+        }
     }
 
     private fun ensureCalibrator(w: Int, h: Int): PanelCalibrator =
@@ -239,6 +291,7 @@ class CollisionAlertService : LifecycleService() {
                 recalibrateRequested = false
                 calibratorRef = null
                 ttcEngine.reset()
+                tracker.reset()
                 startedSoundPlayed = false
                 Log.d(TAG_DEBUG, "recalibracao solicitada pela interface — reiniciando o calibrador do corte")
             }
@@ -268,7 +321,13 @@ class CollisionAlertService : LifecycleService() {
                 if (logThisFrame) {
                     logCalibrating(bitmap.width, bitmap.height, decoded.rotationDegrees, calibrator, result.detections)
                 }
-                publishPreviewFrame(bitmap, decoded.rotationDegrees, effectiveCorte, result.detections, leader = null)
+                // Durante a calibracao nao ha rastreamento: o calibrador precisa
+                // das deteccoes cruas (painel incluso) e o lider ainda nao importa.
+                publishPreviewFrame(
+                    bitmap, decoded.rotationDegrees, effectiveCorte,
+                    result.detections.mapIndexed { i, d -> TrackedTarget(-(i + 1), d, 1, false) },
+                    leaderId = null, leaderWidthPx = null
+                )
 
                 _state.value = _state.value.copy(
                     fps = fps, latencyMs = latencyMs, usingGpu = detector.usingGpu,
@@ -283,8 +342,23 @@ class CollisionAlertService : LifecycleService() {
                 val result = detector.detect(cropped)
                 if (cropped !== bitmap) cropped.recycle()
 
-                val ttc = ttcEngine.process(tSec, result.detections, bitmap.width)
+                // Rastreia primeiro (identidade + descarte de objetos fixos),
+                // depois calcula: o TtcEngine so recebe o lider ja decidido.
+                val rast = tracker.update(tSec, result.detections, bitmap.width)
+                val ttc = ttcEngine.process(
+                    t = tSec,
+                    leader = rast.leader?.detection,
+                    leaderChanged = rast.leaderChanged,
+                    aguardandoReaparecer = rast.aguardandoReaparecer,
+                    frameW = bitmap.width
+                )
                 val latencyMs = (SystemClock.elapsedRealtimeNanos() - frameStartNanos) / 1_000_000
+
+                if (rast.leaderChanged && rast.leaderChangeReason != null) {
+                    // Sempre logado, fora do throttle: eleicao de lider e evento raro
+                    // e e exatamente o que precisamos ver pra validar o rastreamento.
+                    Log.d(TAG_DEBUG, "LIDER NOVO: ${rast.leaderChangeReason} (serie reiniciada)")
+                }
 
                 if (ttc.alertaDisparado) {
                     soundPlayer.playCollisionAlert()
@@ -297,11 +371,13 @@ class CollisionAlertService : LifecycleService() {
                 if (logThisFrame) {
                     logMonitoring(
                         bitmap.width, bitmap.height, decoded.rotationDegrees, calibrator,
-                        effectiveCorte, corteH, manualNoCrop, result.detections, ttc,
-                        result.maxVehicleConf
+                        effectiveCorte, corteH, manualNoCrop, rast, ttc, result.maxVehicleConf
                     )
                 }
-                publishPreviewFrame(bitmap, decoded.rotationDegrees, effectiveCorte, result.detections, leader = ttc.leader)
+                publishPreviewFrame(
+                    bitmap, decoded.rotationDegrees, effectiveCorte, rast.targets,
+                    leaderId = rast.leader?.id, leaderWidthPx = rast.leader?.detection?.width
+                )
 
                 _state.value = _state.value.copy(
                     running = true, calibrating = false, ttcS = ttc.ttcS,
@@ -330,7 +406,8 @@ class CollisionAlertService : LifecycleService() {
 
     /** So copia e publica o bitmap quando o preview esta ligado — custo zero no caminho padrao (desligado). */
     private fun publishPreviewFrame(
-        bitmap: Bitmap, rotationDegrees: Int, corteFrac: Float, detections: List<Detection>, leader: Detection?
+        bitmap: Bitmap, rotationDegrees: Int, corteFrac: Float,
+        targets: List<TrackedTarget>, leaderId: Int?, leaderWidthPx: Float?
     ) {
         if (!_previewEnabled.value) return
         val corteYPx = (bitmap.height * corteFrac).toInt().coerceIn(0, bitmap.height)
@@ -342,9 +419,9 @@ class CollisionAlertService : LifecycleService() {
             rotationDegrees = rotationDegrees,
             corteFrac = corteFrac,
             corteYPx = corteYPx,
-            detections = detections,
-            leader = leader,
-            leaderWidthPx = leader?.width
+            targets = targets,
+            leaderId = leaderId,
+            leaderWidthPx = leaderWidthPx
         )
     }
 
@@ -355,58 +432,79 @@ class CollisionAlertService : LifecycleService() {
         Log.d(TAG_DEBUG, "frame ${frameW}x${frameH} rotacao=${rotation}graus")
         Log.d(TAG_DEBUG, "corte provisorio: frac=%.3f (sem corte ate concluir a calibracao)".format(calibrator.result))
         Log.d(TAG_DEBUG, "deteccoes brutas do modelo: ${deteccoes.size}")
-        dumpDeteccoes(deteccoes)
+        if (deteccoes.isEmpty()) {
+            Log.d(TAG_DEBUG, "  (nenhuma deteccao de veiculo neste frame)")
+        } else {
+            deteccoes.forEachIndexed { i, d ->
+                Log.d(
+                    TAG_DEBUG,
+                    "  [$i] classe=${nomeClasse(d.classId)} conf=%.2f caixa=(%.0f,%.0f,%.0f,%.0f) largura=%.0f centerX=%.0f"
+                        .format(d.conf, d.x1, d.y1, d.x2, d.y2, d.width, d.centerX)
+                )
+            }
+        }
     }
 
     private fun logMonitoring(
         frameW: Int, frameH: Int, rotation: Int, calibrator: PanelCalibrator,
         effectiveCorte: Float, corteYPx: Int, manualNoCrop: Boolean,
-        deteccoes: List<Detection>, ttc: TtcResult, maxVehicleConf: Float
+        rast: TrackingResult, ttc: TtcResult, maxVehicleConf: Float
     ) {
         Log.d(TAG_DEBUG, "== frame (monitorando) ==")
-        Log.d(TAG_DEBUG, "frame ${frameW}x${frameH} rotacao=${rotation}graus")
+        Log.d(TAG_DEBUG, "frame ${frameW}x${frameH} rotacao efetiva=${rotation}graus (dimensoes ja entregues ao modelo)")
         Log.d(TAG_DEBUG, "painel: ${if (calibrator.painelEncontrado == true) "encontrado" else "nao encontrado"}" +
                 (if (manualNoCrop) " (corte manual desativado nos ajustes — sobrepoe a calibracao)" else ""))
         Log.d(TAG_DEBUG, "corte em uso: frac=%.3f px=%d (deteccao so roda acima dessa linha)".format(effectiveCorte, corteYPx))
-        Log.d(TAG_DEBUG, "deteccoes brutas do modelo (ja filtradas por classe/conf, sem filtro de largura/terco): ${deteccoes.size}")
+        Log.d(TAG_DEBUG, "alvos rastreados: ${rast.targets.size}")
         // Com 0 deteccoes, este numero diz se o detector esta funcionando:
         // valor baixo mas variando frame a frame = cena sem veiculo (ok);
         // colado em 0 ou constante = pre-processamento quebrado.
         Log.d(TAG_DEBUG, "maior confianca de veiculo no tensor (antes do corte de %.2f): %.4f"
             .format(0.25f, maxVehicleConf))
-        dumpDeteccoes(deteccoes)
-        Log.d(TAG_DEBUG, "apos filtro de largura (descarta caixa > 70% do quadro): ${ttc.afterWidthFilter}")
-        Log.d(TAG_DEBUG, "apos filtro do terco central (33%-67% da largura): ${ttc.afterCenterFilter}")
+        dumpAlvos(rast.targets, rast.leader?.id)
+        Log.d(TAG_DEBUG, "descartados por imobilidade (parte do proprio carro): ${rast.descartadosPorImobilidade}")
+        Log.d(TAG_DEBUG, "candidatos moveis: ${rast.candidatosMoveis} (nao ha mais filtro por largura maxima)")
+        Log.d(TAG_DEBUG, "apos filtro do terco central (33%-67% da largura): ${rast.aposFiltroTercoCentral}")
 
-        val leader = ttc.leader
+        val leader = rast.leader
         if (leader == null) {
-            Log.d(TAG_DEBUG, "sem lider: ${ttc.semLiderMotivo}")
+            Log.d(TAG_DEBUG, "sem lider: ${rast.semLiderMotivo}")
         } else {
-            Log.d(TAG_DEBUG, "lider: classe=${nomeClasse(leader.classId)} largura=%.0fpx centerX=%.0f".format(leader.width, leader.centerX))
-            Log.d(TAG_DEBUG, "largura suavizada=%s dw=%s px/s".format(
-                ttc.larguraSuave?.let { "%.1fpx".format(it) } ?: "--",
-                ttc.dwPxS?.let { "%.1f".format(it) } ?: "--"
-            ))
+            Log.d(TAG_DEBUG, "lider #${leader.id}: classe=${nomeClasse(leader.detection.classId)} " +
+                    "largura=%.0fpx centerX=%.0f acompanhado ha ${rast.leaderFramesTracked} frame(s)"
+                        .format(leader.detection.width, leader.detection.centerX))
+            // serie: separa "curta demais" de "derivada insuficiente"
+            Log.d(TAG_DEBUG, "serie: ${ttc.amostrasSerie}/${TtcEngine.MIN_AMOSTRAS_REGRESSAO} amostras " +
+                    "largura_suave=%s dw=%s px/s".format(
+                        ttc.larguraSuave?.let { "%.1fpx".format(it) } ?: "--",
+                        ttc.dwPxS?.let { "%.1f".format(it) } ?: "--"
+                    ))
             if (ttc.deriva != null) {
                 Log.d(TAG_DEBUG, "deriva lateral=%.4f (limite=${TtcEngine.DERIVA_MAX})".format(ttc.deriva))
             }
             if (ttc.ttcS != null) {
-                Log.d(TAG_DEBUG, "TTC calculado = %.2fs (alerta=${ttc.alertaDisparado}, baixoSeguidos=${ttc.baixoSeguidos})".format(ttc.ttcS))
+                Log.d(TAG_DEBUG, "TTC calculado = %.2fs (alerta=${ttc.alertaDisparado}, baixoSeguidos=${ttc.baixoSeguidos}/${TtcEngine.CONFIRMA_FRAMES})".format(ttc.ttcS))
             } else {
                 Log.d(TAG_DEBUG, "TTC NAO calculado: ${ttc.semTtcMotivo ?: "motivo desconhecido"}")
             }
         }
     }
 
-    private fun dumpDeteccoes(deteccoes: List<Detection>) {
-        if (deteccoes.isEmpty()) {
+    private fun dumpAlvos(alvos: List<TrackedTarget>, leaderId: Int?) {
+        if (alvos.isEmpty()) {
             Log.d(TAG_DEBUG, "  (nenhuma deteccao de veiculo neste frame)")
             return
         }
-        deteccoes.forEachIndexed { i, d ->
+        for (a in alvos) {
+            val d = a.detection
+            val marca = when {
+                a.id == leaderId -> " <== LIDER"
+                a.isStatic -> " [FIXO: parte do proprio carro, descartado]"
+                else -> ""
+            }
             Log.d(
                 TAG_DEBUG,
-                "  [$i] classe=${nomeClasse(d.classId)} conf=%.2f caixa=(%.0f,%.0f,%.0f,%.0f) largura=%.0f centerX=%.0f"
+                "  #${a.id} classe=${nomeClasse(d.classId)} conf=%.2f caixa=(%.0f,%.0f,%.0f,%.0f) largura=%.0f centerX=%.0f visto_ha=${a.framesSeen}f$marca"
                     .format(d.conf, d.x1, d.y1, d.x2, d.y2, d.width, d.centerX)
             )
         }
@@ -497,7 +595,10 @@ class CollisionAlertService : LifecycleService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        orientationListener?.disable()
+        orientationListener = null
         cameraProvider?.unbindAll()
+        imageAnalysis = null
         analysisExecutor.shutdown()
         if (::detector.isInitialized) detector.close()
         if (::soundPlayer.isInitialized) soundPlayer.release()
