@@ -16,11 +16,9 @@ data class TtcResult(
     val baixoSeguidos: Int,
     val alertaDisparado: Boolean,
     val leader: Detection?,
-    // Campos de diagnostico abaixo: so relatam por onde a logica passou,
-    // nao influenciam nenhuma decisao. Ver TtcEngine.process.
-    val afterWidthFilter: Int,
-    val afterCenterFilter: Int,
-    val semLiderMotivo: String?,
+    /** Comprimento atual da serie de larguras — separa "serie curta" de "derivada insuficiente". */
+    val amostrasSerie: Int,
+    /** Diagnostico: por que o TTC nao saiu. Nao influencia nenhuma decisao. */
     val semTtcMotivo: String?
 )
 
@@ -40,6 +38,13 @@ data class TtcResult(
  * de diagnostico em TtcResult) — os limiares e a ordem de avaliacao sao
  * exatamente os mesmos do script, so reescritos em if/else explicito em
  * vez de uma condicao composta, pra poder nomear o motivo em cada ramo.
+ *
+ * A ESCOLHA do lider nao mora mais aqui: quem elege e o TargetTracker,
+ * que mantem identidade entre frames. Antes o lider era reeleito a cada
+ * frame como "a maior caixa do terco central" e pulava entre veiculos
+ * diferentes, o que transformava a serie de larguras em ruido e impedia
+ * a confirmacao temporal de fechar. Este arquivo so recebe o lider ja
+ * decidido e faz a conta.
  */
 class TtcEngine {
 
@@ -54,13 +59,6 @@ class TtcEngine {
         const val JANELA_SUAV_S = 0.3
         const val JANELA_DERIV_S = 0.5
     }
-
-    private data class SelecaoLider(
-        val leader: Detection?,
-        val afterWidthFilter: Int,
-        val afterCenterFilter: Int,
-        val motivo: String?
-    )
 
     private val bruto = FixedWindowDeque<Float>(9)
     private val serie = FixedWindowDeque<Pair<Double, Double>>(15)      // (t, largura_suave)
@@ -87,31 +85,24 @@ class TtcEngine {
         baixoSeguidos = 0
     }
 
-    /** Lider = maior caixa no terco central; descarta caixa mais larga que 0.7*frameW (e o proprio carro / erro). */
-    private fun selecionarLider(deteccoes: List<Detection>, frameW: Int): SelecaoLider {
-        if (deteccoes.isEmpty()) {
-            return SelecaoLider(null, 0, 0, "nenhuma deteccao")
-        }
-        val semLargasDemais = deteccoes.filter { it.width <= 0.7f * frameW }
-        if (semLargasDemais.isEmpty()) {
-            return SelecaoLider(null, 0, 0, "todas largas demais (> 70% do quadro)")
-        }
-        val centrais = semLargasDemais.filter { it.centerX in (0.33f * frameW)..(0.67f * frameW) }
-        if (centrais.isEmpty()) {
-            return SelecaoLider(null, semLargasDemais.size, 0, "todas fora do terco central")
-        }
-        val leader = centrais.maxByOrNull { it.width }
-        return SelecaoLider(leader, semLargasDemais.size, centrais.size, null)
-    }
-
     /**
      * @param t tempo monotonico em segundos desde o inicio da sessao (nao frame_n/fps fixo)
-     * @param deteccoes deteccoes de veiculo do frame atual, ja recortado pela linha do painel
-     * @param frameW largura do frame usado para deteccao (mesma referencia usada no recorte central)
+     * @param leader alvo ja eleito pelo TargetTracker, com identidade mantida entre frames
+     * @param leaderChanged alvo novo: a serie precisa ser reiniciada, porque misturar
+     *        larguras de dois veiculos na mesma derivada produz um TTC que nao
+     *        descreve nenhum dos dois
+     * @param aguardandoReaparecer lider sumiu neste frame mas ainda dentro da tolerancia:
+     *        preserva a serie em vez de zera-la por um sumico de 1-2 frames
+     * @param frameW largura do frame usado para deteccao
      */
-    fun process(t: Double, deteccoes: List<Detection>, frameW: Int): TtcResult {
-        val selecao = selecionarLider(deteccoes, frameW)
-        val leader = selecao.leader
+    fun process(
+        t: Double,
+        leader: Detection?,
+        leaderChanged: Boolean,
+        aguardandoReaparecer: Boolean,
+        frameW: Int
+    ): TtcResult {
+        if (leaderChanged) reset()
 
         var larg: Float? = null
         var suave: Double? = null
@@ -152,9 +143,11 @@ class TtcEngine {
                     }
                 }
             }
-        } else {
+        } else if (!aguardandoReaparecer) {
+            // Perdeu o alvo de vez: zera, nao extrapola.
             reset()
         }
+        // aguardandoReaparecer: series intactas, nenhuma amostra acrescentada.
 
         // portao 6: confirmacao temporal, contra pico isolado
         baixoSeguidos = if (ttc != null && ttc < TTC_ALERTA) baixoSeguidos + 1 else 0
@@ -168,7 +161,7 @@ class TtcEngine {
 
         return TtcResult(
             larg, suave, dw, deriva, ttc, baixoSeguidos, alerta, leader,
-            selecao.afterWidthFilter, selecao.afterCenterFilter, selecao.motivo, semTtcMotivo
+            serie.size, semTtcMotivo
         )
     }
 }
